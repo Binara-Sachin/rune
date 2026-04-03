@@ -1,0 +1,15 @@
+# Rune OIDC Provider Configuration
+
+[server]
+# The address and port to bind to
+bind_address = "127.0.0.1:3000"
+
+[oidc]
+# The OIDC issuer identifier. This MUST match the URL clients use to reach this server.
+# Per OpenID Connect Discovery 1.0 §3: The issuer value returned MUST be identical
+# to the Issuer URL that was directly used to retrieve the configuration information.
+issuer_url = "http://localhost:3000"
+
+[keys]
+# Directory where signing keys will be stored
+key_path = "./keys"

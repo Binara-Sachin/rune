@@ -1,59 +1,51 @@
 mod config;
-mod crypto;
 mod error;
-mod oidc;
 mod server;
-mod store;
-mod ui;
 
-use axum::{routing::get, Json, Router};
-use tracing::info;
+use anyhow::Context;
+use std::sync::Arc;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+/// Shared application state passed to every request handler.
+pub struct AppState {
+    pub config: config::Config,
+}
 
 #[tokio::main]
-async fn main() {
-    // Initialize the tracing subscriber with default INFO logs
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+async fn main() -> anyhow::Result<()> {
+    // Initialize structured logging.
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "rune=info".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Starting Rune");
+    // Load config
+    let config = config::Config::load()
+        .context("Failed to load configuration from config.toml")?;
 
-    // Build the HTTP router.
-    let app = Router::new().route("/health", get(health));
+    tracing::info!(
+        issuer = %config.oidc.issuer_url,
+        bind = %config.server.bind_address,
+        "Rune starting"
+    );
 
-    // Bind to a TCP listener on localhost port 3000.
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let bind_address = config.server.bind_address.clone();
+    let state = Arc::new(AppState { config });
+
+    let app = server::router(state);
+
+    let listener = tokio::net::TcpListener::bind(&bind_address)
         .await
-        .expect("Failed to bind to port 3000");
+        .with_context(|| format!("Failed to bind to {}", bind_address))?;
 
-    info!("Listening on http://127.0.0.1:3000");
+    tracing::info!("Listening on http://{}", bind_address);
 
-    // Hand the listener and router to axum and start serving.
     axum::serve(listener, app)
         .await
-        .expect("Server error");
-}
+        .context("Server error")?;
 
-/// Health check handler.
-async fn health() -> Json<serde_json::Value> {
-    info!("Health Check endpoint called.");
-    Json(serde_json::json!({
-        "status": "ok"
-    }))
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Verify that the health handler returns the expected JSON shape.
-    #[tokio::test]
-    async fn test_health_returns_ok() {
-        let Json(body) = health().await;
-        assert_eq!(body["status"], "ok");
-    }
+    Ok(())
 }
