@@ -4,3 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum = "0.7" # HTTP server framework
+tokio = { version = "1", features = ["full"] } # Async runtime
+serde = { version = "1", features = ["derive"] } # Serialization/deserialization framework
+serde_json = "1" # JSON support
+tracing = "0.1" # Logging
+tracing-subscriber = { version = "0.3", features = ["env-filter"] } # Logging implementation

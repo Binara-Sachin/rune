@@ -1,0 +1,1 @@
+// TODO: Centralized application error types using `thiserror`.
